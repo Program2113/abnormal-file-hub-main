@@ -32,3 +32,12 @@ def calculate_storage_savings():
     for group in groups:
         total_savings += (group['count'] - 1) * group['file_size']
     return total_savings
+
+def get_file_stats():
+    """
+    Return total number of uploaded files and total size (in MB).
+    """
+    total_files = File.objects.count()
+    total_size_bytes = File.objects.aggregate(total=Sum('size'))['total'] or 0
+    total_size_mb = total_size_bytes / (1024 ** 2)
+    return total_files, total_size_mb

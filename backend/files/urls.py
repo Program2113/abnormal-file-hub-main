@@ -7,4 +7,6 @@ router.register(r'files', FileViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('api/storage-savings/', storage_savings_view, name='storage_savings'),
+
 ] 

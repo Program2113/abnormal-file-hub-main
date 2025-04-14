@@ -47,3 +47,20 @@ export const fileService = {
     }
   },
 }; 
+
+export const getStorageSavings = async (): Promise<{ savings_bytes: number }> => {
+  const response = await fetch('/api/storage-savings/', {
+    credentials: 'include', // needed if using session-based login
+  });
+  if (!response.ok) throw new Error('Failed to fetch storage savings');
+  return response.json();
+};
+
+export const getFileStats = async (): Promise<{ total_files: number; total_size: number }> => {
+  const response = await fetch('/api/stats/', {
+    credentials: 'include',
+  });
+  if (!response.ok) throw new Error("Failed to fetch file stats");
+  return response.json();
+};
+

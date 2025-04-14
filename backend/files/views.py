@@ -3,6 +3,27 @@ from rest_framework import viewsets, status
 from rest_framework.response import Response
 from .models import File
 from .serializers import FileSerializer
+from .utils import get_file_stats
+
+from django.http import JsonResponse
+from .utils import calculate_storage_savings
+from django.contrib.admin.views.decorators import staff_member_required
+
+
+@staff_member_required
+def storage_savings_view(request):
+    savings_bytes = calculate_storage_savings()
+    return JsonResponse({
+        'savings_bytes': savings_bytes
+    })
+
+@staff_member_required
+def file_stats_view(request):
+    total_files, total_size_mb = get_file_stats()
+    return JsonResponse({
+        'total_files': total_files,
+        'total_size': total_size_mb
+    })
 
 # Create your views here.
 
