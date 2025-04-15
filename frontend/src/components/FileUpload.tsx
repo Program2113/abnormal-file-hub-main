@@ -20,7 +20,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
       setSelectedFile(null);
       onUploadSuccess();
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       setError('Failed to upload file. Please try again.');
       console.error('Upload error:', error);
     },

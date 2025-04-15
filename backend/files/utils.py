@@ -1,19 +1,6 @@
 # utils.py
-import hashlib
-from django.db.models import Count, F
-from myapp.models import File  # Adjust the import based on your app name
-
-def compute_file_hash(file_obj):
-    """
-    Compute and return the SHA256 hash for the given file object.
-    The file pointer is expected to be at the beginning of the file.
-    """
-    file_obj.seek(0)
-    hasher = hashlib.sha256()
-    for chunk in file_obj.chunks():
-        hasher.update(chunk)
-    # Return the hexadecimal digest.
-    return hasher.hexdigest()
+from django.db.models import Count, F, Sum
+from .models import File
 
 def calculate_storage_savings():
     """
