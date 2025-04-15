@@ -1,31 +1,29 @@
-from django.shortcuts import render
+from django.http import JsonResponse
+from django.contrib.admin.views.decorators import staff_member_required
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from .models import File
 from .serializers import FileSerializer
-from .utils import get_file_stats
-
-from django.http import JsonResponse
-from .utils import calculate_storage_savings
-from django.contrib.admin.views.decorators import staff_member_required
-
+from .utils import get_file_stats, calculate_storage_savings
 
 @staff_member_required
-def storage_savings_view(request):
-    savings_bytes = calculate_storage_savings()
-    return JsonResponse({
-        'savings_bytes': savings_bytes
-    })
-
-@staff_member_required
-def file_stats_view(request):
+def combined_file_stats_view(request):
+    """
+    Returns a JSON object with both file statistics and storage savings.
+    This endpoint is restricted to admin (staff) users.
+    """
+    # Retrieve file statistics (e.g., total file count and total size in MB)
     total_files, total_size_mb = get_file_stats()
+    
+    # Retrieve the storage savings in bytes due to deduplication.
+    savings_bytes = calculate_storage_savings()
+    
+    # Return as JSON.
     return JsonResponse({
-        'total_files': total_files,
-        'total_size': total_size_mb
+        "total_files": total_files,
+        "total_size": total_size_mb,
+        "savings_bytes": savings_bytes,
     })
-
-# Create your views here.
 
 class FileViewSet(viewsets.ModelViewSet):
     queryset = File.objects.all()
