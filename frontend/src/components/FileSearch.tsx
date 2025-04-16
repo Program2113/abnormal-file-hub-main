@@ -1,17 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FileFilterParams } from '../services/fileService';
 import { 
   MagnifyingGlassIcon, 
   XMarkIcon, 
-  FunnelIcon,
   DocumentIcon,
   PhotoIcon,
   VideoCameraIcon,
   DocumentTextIcon,
+  TableCellsIcon,
+  DocumentChartBarIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   ArrowPathIcon,
-  CheckIcon
+  CheckIcon,
+  FunnelIcon
 } from '@heroicons/react/24/outline';
 import { useDebounce } from '../hooks/useDebounce';
 
@@ -20,295 +22,228 @@ interface FileSearchProps {
   files: Array<{ id: string; original_filename: string; file_type: string }>;
 }
 
+const FILE_TYPES = [
+  { id: 'all', label: 'All', icon: DocumentTextIcon },
+  { id: 'image', label: 'Images', icon: PhotoIcon },
+  { id: 'document', label: 'Documents', icon: DocumentIcon },
+  { id: 'text', label: 'Text', icon: DocumentTextIcon },
+  { id: 'spreadsheet', label: 'Spreadsheets', icon: TableCellsIcon },
+  { id: 'other', label: 'Other', icon: DocumentChartBarIcon },
+];
+
 export const FileSearch: React.FC<FileSearchProps> = ({ onSearch, files }) => {
   const [filters, setFilters] = useState<FileFilterParams>({});
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [tempFilters, setTempFilters] = useState<FileFilterParams>({});
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
+  const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
-  // Filter files based on search query
-  const filteredFiles = files.filter(file => 
-    file.original_filename.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
-  );
+  // Filter files based on search query and file type
+  const filteredFiles = files.filter(file => {
+    const matchesSearch = !searchQuery || file.original_filename.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesType = !tempFilters.file_type || tempFilters.file_type === 'all' || file.file_type === tempFilters.file_type;
+    console.log('File:', file.original_filename, 'Type:', file.file_type, 'Filter:', tempFilters.file_type, 'Matches:', matchesType);
+    return matchesSearch && matchesType;
+  });
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    if (name === 'search') {
-      setSearchQuery(value);
-    } else {
-      setTempFilters(prev => ({ ...prev, [name]: value }));
-    }
+  const handleInputChange = (field: string, value: string) => {
+    console.log('Input change:', field, value);
+    setTempFilters(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
   const handleApply = () => {
-    // Create new filters object
-    const newFilters = {
-      ...tempFilters,
-      selected_files: Array.from(selectedFiles)
+    console.log('Applying filters:', tempFilters, 'searchQuery:', searchQuery, 'selectedFiles:', selectedFiles);
+    
+    // Create a new filters object with all current filters
+    const newFilters: FileFilterParams = {
+      filename: searchQuery || undefined,
+      file_type: tempFilters.file_type && tempFilters.file_type !== 'all' ? tempFilters.file_type : undefined,
+      min_size: tempFilters.min_size ? Number(tempFilters.min_size) * 1024 * 1024 : undefined,
+      max_size: tempFilters.max_size ? Number(tempFilters.max_size) * 1024 * 1024 : undefined,
+      start_date: tempFilters.start_date || undefined,
+      end_date: tempFilters.end_date || undefined,
+      selected_files: selectedFiles.length > 0 ? selectedFiles : undefined
     };
 
-    // First minimize the pane
-    setIsExpanded(false);
-
-    // Then update filters and trigger search
+    // Remove undefined values
+    Object.keys(newFilters).forEach(key => 
+      newFilters[key as keyof FileFilterParams] === undefined && delete newFilters[key as keyof FileFilterParams]
+    );
+    
+    console.log('Final filters being sent:', newFilters);
+    
+    // Update the filters and close the panel
     setFilters(newFilters);
     onSearch(newFilters);
-
-    // Clear temp filters after a short delay to ensure UI updates are complete
-    setTimeout(() => {
-      setTempFilters({});
-    }, 100);
+    setIsExpanded(false);
   };
+  
 
   const handleReset = () => {
     setTempFilters({});
     setFilters({});
     setSearchQuery('');
-    setSelectedFiles(new Set());
+    setSelectedFiles([]);
     onSearch({});
   };
 
   const toggleFileSelection = (fileId: string) => {
-    setSelectedFiles(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(fileId)) {
-        newSet.delete(fileId);
-      } else {
-        newSet.add(fileId);
-      }
-      return newSet;
-    });
+    setSelectedFiles(prev => 
+      prev.includes(fileId)
+        ? prev.filter(id => id !== fileId)
+        : [...prev, fileId]
+    );
   };
 
-  const hasActiveFilters = Object.keys(filters).length > 0 || selectedFiles.size > 0;
-  const hasTempFilters = Object.keys(tempFilters).length > 0 || selectedFiles.size > 0;
+  const hasActiveFilters = Object.keys(filters).length > 0;
 
   return (
-    <div className={`fixed left-0 top-0 h-full bg-white shadow-lg transition-all duration-300 ease-in-out ${
-      isExpanded ? 'w-80' : 'w-12'
-    }`}>
-      {/* Toggle Button */}
+    <div className="fixed left-0 top-0 h-full bg-white shadow-lg transition-all duration-300 ease-in-out z-10"
+         style={{ width: isExpanded ? '300px' : '60px' }}>
+      {/* Toggle button */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="absolute -right-3 top-4 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-md hover:bg-gray-50"
+        className="absolute right-0 top-4 p-2 rounded-full hover:bg-gray-100"
       >
         {isExpanded ? (
-          <ChevronLeftIcon className="h-4 w-4 text-gray-500" />
+          <ChevronLeftIcon className="h-5 w-5 text-gray-500" />
         ) : (
-          <ChevronRightIcon className="h-4 w-4 text-gray-500" />
+          <FunnelIcon className="h-5 w-5 text-gray-500" />
         )}
       </button>
 
-      {/* Search Bar - Only visible when expanded */}
-      {isExpanded && (
-        <div className="p-4 border-b">
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
+      {isExpanded ? (
+        <div className="h-full flex flex-col">
+          {/* Search bar */}
+          <div className="p-4 border-b">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search files..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <MagnifyingGlassIcon className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
             </div>
-            <input
-              type="text"
-              name="search"
-              value={searchQuery}
-              onChange={handleInputChange}
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-              placeholder="Search files..."
-            />
           </div>
-        </div>
-      )}
 
-      {/* Search Results */}
-      {isExpanded && debouncedSearchQuery && (
-        <div className="px-4 py-2 max-h-60 overflow-y-auto">
-          {filteredFiles.length > 0 ? (
-            <div className="space-y-1">
-              {filteredFiles.map(file => (
+          {/* Search results */}
+          <div className="flex-1 overflow-y-auto p-4">
+            {filteredFiles.map(file => (
+              <div
+                key={file.id}
+                className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg cursor-pointer"
+                onClick={() => toggleFileSelection(file.id)}
+              >
+                <span className="text-sm truncate">{file.original_filename}</span>
+                {selectedFiles.includes(file.id) ? (
+                  <CheckIcon className="h-5 w-5 text-blue-500" />
+                ) : null}
+              </div>
+            ))}
+          </div>
+
+          {/* File type filters */}
+          <div className="p-4 border-t">
+            <h3 className="text-sm font-medium text-gray-700 mb-2">File Type</h3>
+            <div className="grid grid-cols-2 gap-2">
+              {FILE_TYPES.map((type) => (
                 <button
-                  key={file.id}
-                  onClick={() => toggleFileSelection(file.id)}
-                  className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${
-                    selectedFiles.has(file.id)
-                      ? 'bg-primary-50 text-primary-700'
-                      : 'hover:bg-gray-50 text-gray-700'
+                  key={type.id}
+                  onClick={() => handleInputChange('file_type', type.id)}
+                  className={`flex items-center justify-center p-2 rounded-lg border ${
+                    tempFilters.file_type === type.id
+                      ? 'bg-blue-50 border-blue-500 text-blue-700'
+                      : 'border-gray-200 hover:bg-gray-50'
                   }`}
                 >
-                  <span className="truncate">{file.original_filename}</span>
-                  {selectedFiles.has(file.id) && (
-                    <CheckIcon className="h-4 w-4 text-primary-600" />
-                  )}
+                  <type.icon className="h-5 w-5 mr-2" />
+                  <span className="text-sm">{type.label}</span>
                 </button>
               ))}
             </div>
-          ) : (
-            <div className="text-center py-2 text-sm text-gray-500">
-              No files found
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Filter Chips - Only visible when expanded */}
-      {hasActiveFilters && isExpanded && (
-        <div className="px-4 py-2 bg-gray-50 border-b">
-          <div className="flex flex-wrap gap-2">
-            {Array.from(selectedFiles).map(fileId => {
-              const file = files.find(f => f.id === fileId);
-              return file ? (
-                <span
-                  key={fileId}
-                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800"
-                >
-                  {file.original_filename}
-                  <button
-                    onClick={() => toggleFileSelection(fileId)}
-                    className="ml-1 inline-flex items-center justify-center h-4 w-4 rounded-full hover:bg-primary-200"
-                  >
-                    <XMarkIcon className="h-3 w-3" />
-                  </button>
-                </span>
-              ) : null;
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Filters Panel */}
-      {isExpanded && (
-        <div className="p-4 space-y-6 overflow-y-auto h-[calc(100%-180px)]">
-          {/* File Type Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              File Type
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setTempFilters(prev => ({ ...prev, file_type: '' }))}
-                className={`flex flex-col items-center justify-center p-3 rounded-md border ${
-                  !tempFilters.file_type ? 'border-primary-500 bg-primary-50' : 'border-gray-300'
-                }`}
-              >
-                <DocumentIcon className="h-6 w-6 text-gray-500" />
-                <span className="text-xs mt-1">All</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setTempFilters(prev => ({ ...prev, file_type: 'image' }))}
-                className={`flex flex-col items-center justify-center p-3 rounded-md border ${
-                  tempFilters.file_type === 'image' ? 'border-primary-500 bg-primary-50' : 'border-gray-300'
-                }`}
-              >
-                <PhotoIcon className="h-6 w-6 text-gray-500" />
-                <span className="text-xs mt-1">Images</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setTempFilters(prev => ({ ...prev, file_type: 'video' }))}
-                className={`flex flex-col items-center justify-center p-3 rounded-md border ${
-                  tempFilters.file_type === 'video' ? 'border-primary-500 bg-primary-50' : 'border-gray-300'
-                }`}
-              >
-                <VideoCameraIcon className="h-6 w-6 text-gray-500" />
-                <span className="text-xs mt-1">Videos</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setTempFilters(prev => ({ ...prev, file_type: 'text' }))}
-                className={`flex flex-col items-center justify-center p-3 rounded-md border ${
-                  tempFilters.file_type === 'text' ? 'border-primary-500 bg-primary-50' : 'border-gray-300'
-                }`}
-              >
-                <DocumentTextIcon className="h-6 w-6 text-gray-500" />
-                <span className="text-xs mt-1">Text</span>
-              </button>
-            </div>
           </div>
 
-          {/* Size Range */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Size Range
-            </label>
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2">
+          {/* Size range */}
+          <div className="p-4 border-t">
+            <h3 className="text-sm font-medium text-gray-700 mb-2">Size Range</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Min Size (MB)</label>
                 <input
                   type="number"
-                  name="min_size"
                   value={tempFilters.min_size || ''}
-                  onChange={handleInputChange}
-                  placeholder="Min (bytes)"
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                  onChange={(e) => handleInputChange('min_size', e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <span className="text-gray-500">to</span>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Max Size (MB)</label>
                 <input
                   type="number"
-                  name="max_size"
                   value={tempFilters.max_size || ''}
-                  onChange={handleInputChange}
-                  placeholder="Max (bytes)"
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                  onChange={(e) => handleInputChange('max_size', e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
           </div>
 
-          {/* Date Range */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Upload Date Range
-            </label>
-            <div className="space-y-2">
-              <input
-                type="date"
-                name="start_date"
-                value={tempFilters.start_date || ''}
-                onChange={handleInputChange}
-                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-              />
-              <input
-                type="date"
-                name="end_date"
-                value={tempFilters.end_date || ''}
-                onChange={handleInputChange}
-                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-              />
+          {/* Date range */}
+          <div className="p-4 border-t">
+            <h3 className="text-sm font-medium text-gray-700 mb-2">Date Range</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Start Date</label>
+                <input
+                  type="date"
+                  value={tempFilters.start_date || ''}
+                  onChange={(e) => handleInputChange('start_date', e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">End Date</label>
+                <input
+                  type="date"
+                  value={tempFilters.end_date || ''}
+                  onChange={(e) => handleInputChange('end_date', e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div className="p-4 border-t">
+            <div className="flex gap-2">
+              <button
+                onClick={handleReset}
+                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Reset
+              </button>
+              <button
+                onClick={handleApply}
+                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+              >
+                Apply
+              </button>
             </div>
           </div>
         </div>
-      )}
-
-      {/* Action Buttons - Only visible when expanded */}
-      {isExpanded && (
-        <div className="absolute bottom-0 left-0 right-0 p-4 bg-white border-t">
-          <div className="flex space-x-2">
-            <button
-              type="button"
-              onClick={handleReset}
-              className="flex-1 inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-            >
-              <ArrowPathIcon className="h-4 w-4 mr-2" />
-              Reset
-            </button>
-            <button
-              type="button"
-              onClick={handleApply}
-              className="flex-1 inline-flex items-center justify-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-            >
-              Apply
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Collapsed State - Only show when there are active filters */}
-      {!isExpanded && hasActiveFilters && (
-        <div className="flex flex-col items-center justify-center h-full">
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
-            {selectedFiles.size + Object.keys(filters).length}
-          </span>
+      ) : (
+        <div className="h-full flex items-center justify-center">
+          {hasActiveFilters && (
+            <div className="absolute top-2 right-2 bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+              {selectedFiles.length}
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -7,13 +7,30 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([getFileStats(), getStorageSavings()])
-      .then(([statsData, savingsData]) => {
+    const fetchStats = async () => {
+      console.log('Dashboard: Fetching stats...');
+      try {
+        const [statsData, savingsData] = await Promise.all([
+          getFileStats(),
+          getStorageSavings()
+        ]);
+        
+        console.log('=== Dashboard Stats ===');
+        console.log('Total Files:', statsData.total_files);
+        console.log('Total Size:', (statsData.total_size / (1024 ** 2)).toFixed(2), 'MB');
+        console.log('Storage Savings:', (savingsData / (1024 ** 2)).toFixed(2), 'MB');
+        console.log('=====================');
+        
         setStats(statsData);
         setSavings(savingsData);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      } catch (error) {
+        console.error('Dashboard: Error fetching stats:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
   }, []);
 
   if (loading) return <p>Loading dashboard...</p>;
@@ -24,7 +41,7 @@ const Dashboard = () => {
 
   return (
     <div className="bg-white p-6 rounded-xl shadow-md max-w-md mx-auto mt-10">
-      <h2 className="text-2xl font-bold mb-4 text-center text-gray-800">Admin Dashboard</h2>
+      <h2 className="text-2xl font-bold mb-4 text-center text-gray-800">Analytics</h2>
       <div className="text-center">
         <p className="text-lg text-gray-700">
           <span className="font-semibold text-blue-600">{stats.total_files}</span> files uploaded

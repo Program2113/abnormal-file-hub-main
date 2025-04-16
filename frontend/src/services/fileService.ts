@@ -18,6 +18,7 @@ export interface FileFilterParams {
   max_size?: number;
   start_date?: string;
   end_date?: string;
+  selected_files?: string[];
 }
 
 export const fileService = {
@@ -41,6 +42,9 @@ export const fileService = {
       if (filters.max_size) params.append('max_size', filters.max_size.toString());
       if (filters.start_date) params.append('start_date', filters.start_date);
       if (filters.end_date) params.append('end_date', filters.end_date);
+      if (filters.selected_files) {
+        filters.selected_files.forEach(fileId => params.append('selected_files', fileId));
+      }
     }
     const response = await axios.get(`${API_URL}/files/?${params.toString()}`);
     return response.data;
@@ -66,12 +70,16 @@ export const fileService = {
 
 // Export individual functions for direct use
 export const getStorageSavings = async (): Promise<number> => {
+  console.log('fileService: Fetching storage savings...');
   const response = await axios.get(`${API_URL}/file-stats/`);
+  console.log('fileService: Received storage savings:', response.data);
   return response.data.savings_bytes;
 };
 
 export const getFileStats = async (): Promise<{ total_files: number; total_size: number }> => {
+  console.log('fileService: Fetching file stats...');
   const response = await axios.get(`${API_URL}/file-stats/`);
+  console.log('fileService: Received file stats:', response.data);
   return {
     total_files: response.data.total_files,
     total_size: response.data.total_size,

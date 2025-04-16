@@ -21,6 +21,30 @@ def file_upload_path(instance, filename):
     new_filename = f"{uuid.uuid4()}.{ext}"
     return os.path.join('uploads', new_filename)
 
+def get_file_type(filename):
+    """
+    Determine the file type based on the file extension.
+    """
+    ext = filename.split('.')[-1].lower()
+    
+    # Image types
+    if ext in ['png', 'jpg', 'jpeg', 'gif', 'heif', 'heic', 'tiff', 'tif']:
+        return 'image'
+    
+    # Document types
+    if ext in ['pdf', 'tex', 'odt', 'doc', 'docx']:
+        return 'document'
+    
+    # Text types
+    if ext in ['txt', 'md', 'json', 'xml', 'log', 'html', 'yml', 'yaml']:
+        return 'text'
+    
+    # Spreadsheet types
+    if ext in ['xlsx', 'csv', 'xls', 'odx', 'ods']:
+        return 'spreadsheet'
+    
+    return 'other'
+
 class File(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     file = models.FileField(upload_to=file_upload_path)
@@ -37,19 +61,25 @@ class File(models.Model):
         return self.original_filename
 
     def save(self, *args, **kwargs):
-        # Compute and set file_hash if it's not already set.
+        # Set file type based on extension
+        if not self.file_type:
+            self.file_type = get_file_type(self.original_filename)
+            
+        # Compute and set file_hash if it's not already set
         if not self.file_hash:
             self.file.seek(0)
             self.file_hash = compute_file_hash(self.file)
-            self.file.seek(0)  # Reset file pointer after computing the hash.
+            self.file.seek(0)  # Reset file pointer after computing the hash
 
-        # Check if an identical file exists.
-        duplicate = File.objects.filter(file_hash=self.file_hash).first()
+        # Check if an identical file exists
+        duplicate = File.objects.filter(file_hash=self.file_hash).exclude(id=self.id).first()
         if duplicate:
-            # Point to the same physical file.
+            # Point to the same physical file
             self.file = duplicate.file
-
-        # Update the file size based on the current file.
-        self.size = self.file.size
+            # Use the duplicate's size since we're using the same file
+            self.size = duplicate.size
+        else:
+            # Update the file size based on the current file
+            self.size = self.file.size
 
         super().save(*args, **kwargs)

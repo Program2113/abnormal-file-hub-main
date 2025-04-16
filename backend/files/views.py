@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
 from datetime import datetime, timedelta
-from .models import File
+from .models import File, get_file_type
 from .serializers import FileSerializer
 from .utils import get_file_stats, calculate_storage_savings
 
@@ -34,26 +34,42 @@ class FileFilter(filters.BaseFilterBackend):
         max_size = request.query_params.get('max_size')
         start_date = request.query_params.get('start_date')
         end_date = request.query_params.get('end_date')
+        selected_files = request.query_params.getlist('selected_files')
+
+        print(f"Received filters - file_type: {file_type}, filename: {filename}, min_size: {min_size}, max_size: {max_size}")
 
         # Apply filename search
         if filename:
             queryset = queryset.filter(original_filename__icontains=filename)
+            print(f"After filename filter: {queryset.count()} files")
 
         # Apply file type filter
-        if file_type:
-            queryset = queryset.filter(file_type__icontains=file_type)
+        if file_type and file_type != 'all':
+            queryset = queryset.filter(file_type=file_type)
+            print(f"After file_type filter: {queryset.count()} files")
 
         # Apply size range filter
         if min_size:
-            queryset = queryset.filter(size__gte=min_size)
+            try:
+                min_size_bytes = int(min_size)
+                queryset = queryset.filter(size__gte=min_size_bytes)
+                print(f"After min_size filter: {queryset.count()} files")
+            except ValueError:
+                pass
         if max_size:
-            queryset = queryset.filter(size__lte=max_size)
+            try:
+                max_size_bytes = int(max_size)
+                queryset = queryset.filter(size__lte=max_size_bytes)
+                print(f"After max_size filter: {queryset.count()} files")
+            except ValueError:
+                pass
 
         # Apply date range filter
         if start_date:
             try:
                 start_date = datetime.strptime(start_date, '%Y-%m-%d')
                 queryset = queryset.filter(uploaded_at__gte=start_date)
+                print(f"After start_date filter: {queryset.count()} files")
             except ValueError:
                 pass
         if end_date:
@@ -61,9 +77,16 @@ class FileFilter(filters.BaseFilterBackend):
                 end_date = datetime.strptime(end_date, '%Y-%m-%d')
                 end_date = end_date + timedelta(days=1)  # Include the entire end date
                 queryset = queryset.filter(uploaded_at__lt=end_date)
+                print(f"After end_date filter: {queryset.count()} files")
             except ValueError:
                 pass
 
+        # Apply selected files filter
+        if selected_files:
+            queryset = queryset.filter(id__in=selected_files)
+            print(f"After selected_files filter: {queryset.count()} files")
+
+        print(f"Final filtered count: {queryset.count()} files")
         return queryset
 
 class FileViewSet(viewsets.ModelViewSet):
@@ -80,7 +103,7 @@ class FileViewSet(viewsets.ModelViewSet):
         data = {
             'file': file_obj,
             'original_filename': file_obj.name,
-            'file_type': file_obj.content_type,
+            'file_type': get_file_type(file_obj.name),
             'size': file_obj.size
         }
         

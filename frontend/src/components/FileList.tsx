@@ -21,6 +21,7 @@ export const FileList: React.FC = () => {
   });
 
   const handleSearch = (newFilters: FileFilterParams) => {
+    console.log('Applying new filters:', newFilters);
     setFilters(newFilters);
   };
 
@@ -39,13 +40,15 @@ export const FileList: React.FC = () => {
   if (isLoading) return <div>Loading...</div>;
   if (error) return <div>Error loading files</div>;
 
+  const displayFiles = files || [];
+
   return (
-    <div className="space-y-4">
-      <FileSearch onSearch={handleSearch} files={files || []} />
+    <div className="space-y-4 ml-12">
+      <FileSearch onSearch={handleSearch} files={displayFiles} />
       
       <div className="bg-white shadow overflow-hidden sm:rounded-md">
         <ul className="divide-y divide-gray-200">
-          {files?.map((file: FileType) => (
+          {displayFiles.map((file: FileType) => (
             <li key={file.id} className="px-6 py-4">
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
@@ -73,7 +76,7 @@ export const FileList: React.FC = () => {
               </div>
             </li>
           ))}
-          {files?.length === 0 && (
+          {displayFiles.length === 0 && (
             <li className="px-6 py-4 text-center text-gray-500">
               No files found matching your criteria
             </li>

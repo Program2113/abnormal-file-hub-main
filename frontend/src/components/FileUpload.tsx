@@ -7,6 +7,8 @@ interface FileUploadProps {
   onUploadSuccess: () => void;
 }
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
+
 export const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -28,8 +30,15 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
-      setSelectedFile(event.target.files[0]);
-      setError(null);
+      const file = event.target.files[0];
+      if (file.size > MAX_FILE_SIZE) {
+        setError('File size exceeds 10MB limit. Please select a smaller file.');
+        setSelectedFile(null);
+        event.target.value = ''; // Clear the file input
+      } else {
+        setSelectedFile(file);
+        setError(null);
+      }
     }
   };
 
@@ -51,7 +60,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
     <div className="p-6">
       <div className="flex items-center mb-4">
         <CloudArrowUpIcon className="h-6 w-6 text-primary-600 mr-2" />
-        <h2 className="text-xl font-semibold text-gray-900">Upload File</h2>
+        <h2 className="text-xl font-semibold text-gray-900">Abnormal File Vault Manager</h2>
       </div>
       <div className="mt-4 space-y-4">
         <div className="flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg">
@@ -78,7 +87,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
         </div>
         {selectedFile && (
           <div className="text-sm text-gray-600">
-            Selected: {selectedFile.name}
+            Selected: {selectedFile.name} ({(selectedFile.size / (1024 * 1024)).toFixed(2)} MB)
           </div>
         )}
         {error && (
