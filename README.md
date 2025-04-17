@@ -38,6 +38,24 @@ docker-compose up --build
 ```
 
 ### Local Development Setup
+## Local Development (no Docker)
+
+1. Clone & copy env files:
+   ```bash
+   git clone … && cd abnormal-file-hub-main
+   cp backend/.env.example backend/.env
+   cp frontend/.env.local.example frontend/.env.local
+
+2. Install dependencies:
+   ```bash
+   make deps
+
+3. Run both servers:
+   ```bash
+   make up
+
+This way **one** Makefile drives **everything**—no more venv confusion or “which folder?” questions.
+
 
 #### Backend Setup
 1. **Create and activate virtual environment**
