@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { logger } from '../utils/logger';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
@@ -70,10 +71,15 @@ export const fileService = {
 
 // Export individual functions for direct use
 export const getStorageSavings = async (): Promise<number> => {
-  console.log('fileService: Fetching storage savings...');
-  const response = await axios.get(`${API_URL}/file-stats/`);
-  console.log('fileService: Received storage savings:', response.data);
-  return response.data.savings_bytes;
+  logger.info('fileService: Fetching storage savings...');
+  try {
+    const response = await axios.get(`${API_URL}/file-stats/`);
+    logger.info('fileService: Storage savings received', { savings: response.data.savings_bytes });
+    return response.data.savings_bytes;
+  } catch (error) {
+    logger.error('fileService: Error fetching storage savings', { error });
+    throw error;
+  }
 };
 
 export const getFileStats = async (): Promise<{ total_files: number; total_size: number }> => {
@@ -82,7 +88,7 @@ export const getFileStats = async (): Promise<{ total_files: number; total_size:
   console.log('fileService: Received file stats:', response.data);
   return {
     total_files: response.data.total_files,
-    total_size: response.data.total_size,
+    total_size: response.data.total_size,  // This is in mega bytes
   };
 };
 

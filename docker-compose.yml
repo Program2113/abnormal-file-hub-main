@@ -9,6 +9,7 @@ services:
       - backend_storage:/app/media
       - backend_static:/app/staticfiles
       - backend_data:/app/data
+      - ./backend/logs:/app/logs
     environment:
       - DJANGO_DEBUG=True
       - DJANGO_SECRET_KEY=insecure-dev-only-key
@@ -20,8 +21,10 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
+    volumes:
+      - ./frontend/logs:/app/logs
     environment:
-      - REACT_APP_API_URL=http://localhost:8000/api
+      - REACT_APP_API_URL=http://backend:8000/api
     depends_on:
       - backend
     restart: always

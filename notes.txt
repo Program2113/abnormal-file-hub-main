@@ -1,0 +1,72 @@
+ABNORMAL FILE VAULT - PRESENTATION NOTES
+
+INTRODUCTION (30 seconds)
+"Hello everyone, I'm Bharadwaj, and I've had the opportunity to develop the Abnormal File Vault, a full-stack application using React/TypeScript for the frontend and Django for the backend. I developed this using Cursor IDE with VSCode, which significantly enhanced my development experience."
+
+1. PROJECT OVERVIEW (30 seconds)
+- AI-powered security solution for file management
+- Focus on efficient storage and retrieval of cybersecurity data
+- Built with React frontend and Django/DRF backend
+- Containerized with Docker for easy deployment
+
+2. DEVELOPMENT APPROACH (1 minute)
+- Used Cursor IDE with VSCode for development
+- Leveraged AI assistance through ChatGPT (o3-mini-high)
+- Implemented strategic prompting techniques:
+  * Persona-based approach for better AI responses
+  * Enhanced prompts using ChatGPT
+  * Role-switching between agent and manual development
+- Critical features like Docker configuration and volume binding were manually verified
+- Frontend development was primarily AI-assisted
+- Manual intervention for specific UI issues (search bar and close button overlay)
+
+3. CORE FEATURES (1.5 minutes)
+A. File Deduplication System
+   - Implemented through two key API endpoints:
+     * /api/files/upload/ - Handles file upload and deduplication
+     * /api/files/stats/ - Tracks and displays storage savings
+   - Identifies duplicate files during upload
+   - Stores references instead of duplicates
+   - Tracks and displays storage savings
+   - Reduces storage costs and improves performance
+
+B. Search & Filtering System
+   - Advanced search by filename
+   - Multiple filter options:
+     * File type
+     * Size range
+     * Upload date
+   - Optimized for large datasets
+   - Enables quick incident investigation
+
+4. TECHNICAL IMPLEMENTATION (30 seconds)
+- Frontend: React with TypeScript
+- Backend: Django REST Framework
+- Database: SQLite with proper indexing
+- Containerization: Docker with compose
+- Logging: Comprehensive system for debugging
+- API: RESTful endpoints with proper error handling
+
+5. DEVELOPMENT EXPERIENCE (30 seconds)
+- Rapid development using Cursor IDE
+- Effective use of AI assistance for frontend development
+- Manual verification for critical infrastructure components
+- Successfully resolved UI challenges with AI assistance
+- Significant improvement in development time
+
+6. FUTURE ENHANCEMENTS (30 seconds)
+- Advanced analytics dashboard
+- Real-time file monitoring
+- Enhanced security features
+- Integration with other security tools
+- Performance optimizations
+
+CLOSING (30 seconds)
+"Overall, developing the Abnormal File Vault was an exciting experience. The combination of Cursor IDE and AI assistance significantly improved my development efficiency. While there were challenges, particularly with UI components, the experience has been valuable in understanding how to effectively leverage AI tools in software development."
+
+PRESENTATION TIPS:
+- Start with personal introduction
+- Emphasize the development approach and tools used
+- Highlight specific challenges and solutions
+- Share metrics on development time improvement
+- End with personal learning experience 

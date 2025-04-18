@@ -2,28 +2,78 @@ from django.http import JsonResponse
 from rest_framework import viewsets, status, filters
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Q
+from django.db.models import Q, Sum, Count
 from datetime import datetime, timedelta
 from .models import File, get_file_type
+from .utils import calculate_storage_savings, get_file_stats
 from .serializers import FileSerializer
-from .utils import get_file_stats, calculate_storage_savings
+from django.shortcuts import render
+from rest_framework.decorators import action
+import logging
+from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt
+import json
+import traceback
+from rest_framework.decorators import api_view
+from django.conf import settings
+from django.http import FileResponse
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+import os
+import hashlib
 
+# Configure logger
+logger = logging.getLogger('files')
+logger.setLevel(logging.DEBUG)
+
+@api_view(['GET'])
 def combined_file_stats_view(request):
-    """
-    Returns a JSON object with both file statistics and storage savings.
-    """
-    # Retrieve file statistics (e.g., total file count and total size in MB)
-    total_files, total_size_mb = get_file_stats()
-    
-    # Retrieve the storage savings in bytes due to deduplication.
-    savings_bytes = calculate_storage_savings()
-    
-    # Return as JSON.
-    return JsonResponse({
-        "total_files": total_files,
-        "total_size": total_size_mb,
-        "savings_bytes": savings_bytes,
-    })
+    try:
+        print("File stats endpoint accessed...")
+        logger.info("File stats endpoint accessed", extra={
+            'request_method': request.method,
+            'request_path': request.path,
+            'user_agent': request.META.get('HTTP_USER_AGENT', 'Unknown')
+        })
+        
+        # Get file statistics using utility function
+        total_files, total_size_bytes = get_file_stats()
+        logger.debug("File statistics retrieved", extra={
+            'total_files': total_files,
+            'total_size_bytes': total_size_bytes
+        })
+        
+        # Calculate storage savings using utility function
+        savings_bytes = calculate_storage_savings()
+        logger.debug("Storage savings calculated", extra={
+            'savings_bytes': savings_bytes
+        })
+        
+        # Prepare response data
+        response_data = {
+            'total_files': total_files,
+            'total_size': total_size_bytes,  # in bytes
+            'savings_bytes': savings_bytes  # in bytes
+        }
+        
+        logger.info("File stats request completed successfully", extra={
+            'response_data': response_data
+        })
+        
+        print(f"Response for file stats view: {response_data}")
+        return JsonResponse(response_data)
+        
+    except Exception as e:
+        error_msg = f"Error in combined_file_stats_view: {str(e)}"
+        logger.error(error_msg, exc_info=True, extra={
+            'error_type': type(e).__name__,
+            'error_message': str(e),
+            'traceback': traceback.format_exc()
+        })
+        return JsonResponse({
+            'error': 'An error occurred while processing the request',
+            'details': str(e)
+        }, status=500)
 
 class FileFilter(filters.BaseFilterBackend):
     def filter_queryset(self, request, queryset, view):
@@ -95,21 +145,101 @@ class FileViewSet(viewsets.ModelViewSet):
     filter_backends = [FileFilter, DjangoFilterBackend]
     filterset_fields = ['file_type']
 
+    def list(self, request, *args, **kwargs):
+        logger.info('API: List files request received', {
+            'query_params': dict(request.query_params),
+            'user': request.user.username if request.user.is_authenticated else 'anonymous'
+        })
+        try:
+            response = super().list(request, *args, **kwargs)
+            logger.info('API: List files response', {
+                'status_code': response.status_code,
+                'count': len(response.data)
+            })
+            return response
+        except Exception as e:
+            logger.error('API: List files error', {
+                'error': str(e),
+                'traceback': traceback.format_exc()
+            })
+            raise
+
     def create(self, request, *args, **kwargs):
-        file_obj = request.FILES.get('file')
-        if not file_obj:
-            return Response({'error': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        data = {
-            'file': file_obj,
-            'original_filename': file_obj.name,
-            'file_type': get_file_type(file_obj.name),
-            'size': file_obj.size
-        }
-        
-        serializer = self.get_serializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-        
-        headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        logger.info('API: Create file request received', {
+            'filename': request.FILES.get('file').name if request.FILES.get('file') else None,
+            'user': request.user.username if request.user.is_authenticated else 'anonymous'
+        })
+        try:
+            file_obj = request.FILES.get('file')
+            if not file_obj:
+                return Response({'error': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            data = {
+                'file': file_obj,
+                'original_filename': file_obj.name,
+                'file_type': get_file_type(file_obj.name),
+                'size': file_obj.size
+            }
+            
+            serializer = self.get_serializer(data=data)
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer)
+            
+            headers = self.get_success_headers(serializer.data)
+            response = Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+            logger.info('API: Create file success', {
+                'status_code': response.status_code,
+                'file_id': response.data.get('id')
+            })
+            return response
+        except Exception as e:
+            logger.error('API: Create file error', {
+                'error': str(e),
+                'traceback': traceback.format_exc()
+            })
+            raise
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        logger.info('API: Delete file request received', {
+            'file_id': instance.id,
+            'filename': instance.original_filename,
+            'user': request.user.username if request.user.is_authenticated else 'anonymous'
+        })
+        try:
+            response = super().destroy(request, *args, **kwargs)
+            logger.info('API: Delete file success', {
+                'status_code': response.status_code,
+                'file_id': instance.id
+            })
+            return response
+        except Exception as e:
+            logger.error('API: Delete file error', {
+                'error': str(e),
+                'traceback': traceback.format_exc()
+            })
+            raise
+
+@api_view(['POST'])
+def log_frontend(request):
+    try:
+        message = request.data.get('message')
+        if not message:
+            logger.warning("Received empty log message from frontend")
+            return Response({'error': 'No message provided'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        logger.info(f"Frontend: {message}")
+        return Response({'status': 'success'}, status=status.HTTP_200_OK)
+    except Exception as e:
+        logger.error(f"Error handling frontend log: {str(e)}", exc_info=True)
+        return Response(
+            {'error': 'Internal server error', 'details': str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['GET'])
+def health_check(request):
+    """
+    Simple health check endpoint to verify the backend server is running.
+    """
+    return Response({'status': 'ok', 'message': 'Backend server is running'}, status=status.HTTP_200_OK)

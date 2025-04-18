@@ -1,9 +1,15 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CloudArrowUpIcon, ChartBarIcon } from '@heroicons/react/24/outline';
+import { logger } from '../utils/logger';
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
+
+  const handleAnalyticsClick = () => {
+    logger.info('Home: Analytics button clicked');
+    navigate('/analytics');
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -21,7 +27,7 @@ const Home: React.FC = () => {
             File Upload
           </button>
           <button
-            onClick={() => navigate('/analytics')}
+            onClick={handleAnalyticsClick}
             className="w-full flex items-center justify-center px-4 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
           >
             <ChartBarIcon className="h-5 w-5 mr-2" />

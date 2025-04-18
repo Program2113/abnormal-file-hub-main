@@ -1,6 +1,6 @@
 # files/management/commands/calc_storage_savings.py
 from django.core.management.base import BaseCommand
-from myapp.utils import calculate_storage_savings
+from files.utils import calculate_storage_savings
 
 class Command(BaseCommand):
     help = 'Calculates and displays storage savings due to file deduplication.'

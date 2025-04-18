@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { FileFilterParams } from '../services/fileService';
-import { 
-  MagnifyingGlassIcon, 
-  XMarkIcon, 
+import {
+  MagnifyingGlassIcon,
+  XMarkIcon,
   DocumentIcon,
   PhotoIcon,
   VideoCameraIcon,
@@ -15,6 +15,7 @@ import {
   FunnelIcon
 } from '@heroicons/react/24/outline';
 import { useDebounce } from '../hooks/useDebounce';
+import { logger } from '../utils/logger';
 
 interface FileSearchProps {
   onSearch: (filters: FileFilterParams) => void;
@@ -49,10 +50,15 @@ export const FileSearch: React.FC<FileSearchProps> = ({ onSearch, files }) => {
   });
 
   const handleInputChange = (field: string, value: string) => {
-    setTempFilters(prev => ({ ...prev, [field]: value }));
+    logger.info('Filter input changed', { field, value });
+    setTempFilters(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
   const toggleFileSelection = (fileId: string) => {
+    logger.info('Toggling file selection', { fileId });
     setSelectedFiles(prev =>
       prev.includes(fileId)
         ? prev.filter(id => id !== fileId)
@@ -61,30 +67,27 @@ export const FileSearch: React.FC<FileSearchProps> = ({ onSearch, files }) => {
   };
 
   const handleApply = () => {
+    logger.info('Applying filters', {
+      filters: tempFilters,
+      searchQuery,
+      selectedFiles
+    });
+
     const newFilters: FileFilterParams = {
       filename: searchQuery || undefined,
-      file_type:
-        tempFilters.file_type && tempFilters.file_type !== 'all'
-          ? tempFilters.file_type
-          : undefined,
-      min_size: tempFilters.min_size
-        ? Number(tempFilters.min_size) * 1024 * 1024
-        : undefined,
-      max_size: tempFilters.max_size
-        ? Number(tempFilters.max_size) * 1024 * 1024
-        : undefined,
+      file_type: tempFilters.file_type && tempFilters.file_type !== 'all' ? tempFilters.file_type : undefined,
+      min_size: tempFilters.min_size ? Number(tempFilters.min_size) * 1024 * 1024 : undefined,
+      max_size: tempFilters.max_size ? Number(tempFilters.max_size) * 1024 * 1024 : undefined,
       start_date: tempFilters.start_date || undefined,
       end_date: tempFilters.end_date || undefined,
-      selected_files:
-        selectedFiles.length > 0 ? selectedFiles : undefined,
+      selected_files: selectedFiles.length > 0 ? selectedFiles : undefined
     };
 
-    // remove undefined
-    Object.keys(newFilters).forEach(key => {
-      if ((newFilters as any)[key] === undefined) {
-        delete (newFilters as any)[key];
-      }
-    });
+    Object.keys(newFilters).forEach(key =>
+      newFilters[key as keyof FileFilterParams] === undefined && delete newFilters[key as keyof FileFilterParams]
+    );
+
+    logger.info('Final filters being sent to API', { filters: newFilters });
 
     setFilters(newFilters);
     onSearch(newFilters);
@@ -92,6 +95,7 @@ export const FileSearch: React.FC<FileSearchProps> = ({ onSearch, files }) => {
   };
 
   const handleReset = () => {
+    logger.info('Resetting all filters');
     setTempFilters({});
     setFilters({});
     setSearchQuery('');
@@ -103,25 +107,25 @@ export const FileSearch: React.FC<FileSearchProps> = ({ onSearch, files }) => {
 
   return (
     <div
-      className="fixed left-0 top-0 h-full bg-white/80 shadow-lg transition-all duration-300 ease-in-out z-10"
+      className="fixed left-0 top-0 h-full bg-gradient-to-br from-gray-600 to-gray-800 text-white shadow-lg transition-all duration-300 ease-in-out z-10"
       style={{ width: isExpanded ? '300px' : '60px' }}
     >
       {/* expand/collapse toggle */}
       <button
         onClick={() => setIsExpanded(x => !x)}
-        className="absolute right-0 top-4 p-2 rounded-full hover:bg-gray-100"
+        className="absolute right-0 top-4 p-2 rounded-full hover:bg-gray-700"
       >
         {isExpanded ? (
-          <ChevronLeftIcon className="h-5 w-5 text-gray-500" />
+          <ChevronLeftIcon className="h-5 w-5 text-gray-300" />
         ) : (
-          <FunnelIcon className="h-5 w-5 text-gray-500" />
+          <FunnelIcon className="h-5 w-5 text-gray-300" />
         )}
       </button>
 
       {isExpanded ? (
         <div className="h-full flex flex-col">
           {/* — HEADER: search + magnifier + close button */}
-          <div className="p-4 border-b">
+          <div className="p-4 border-b border-gray-700">
             <div className="relative flex items-center">
               <MagnifyingGlassIcon
                 className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400"
@@ -132,7 +136,7 @@ export const FileSearch: React.FC<FileSearchProps> = ({ onSearch, files }) => {
                 placeholder="Search files..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-10 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                className="w-full pl-10 pr-10 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-300 bg-white text-gray-800"
               />
 
               <button
@@ -149,20 +153,22 @@ export const FileSearch: React.FC<FileSearchProps> = ({ onSearch, files }) => {
             {filteredFiles.map(file => (
               <div
                 key={file.id}
-                className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg cursor-pointer"
+                className="flex items-center justify-between p-2 hover:bg-gray-700 rounded-lg cursor-pointer"
                 onClick={() => toggleFileSelection(file.id)}
               >
-                <span className="text-sm truncate">{file.original_filename}</span>
+                <span className="text-sm truncate text-white">
+                  {file.original_filename}
+                </span>
                 {selectedFiles.includes(file.id) && (
-                  <CheckIcon className="h-5 w-5 text-blue-500" />
+                  <CheckIcon className="h-5 w-5 text-gray-300" />
                 )}
               </div>
             ))}
           </div>
 
           {/* — File type filters */}
-          <div className="p-4 border-t">
-            <h3 className="text-sm font-medium text-gray-700 mb-2">
+          <div className="p-4 border-t border-gray-700">
+            <h3 className="text-sm font-medium text-gray-200 mb-2">
               File Type
             </h3>
             <div className="grid grid-cols-2 gap-2">
@@ -172,8 +178,8 @@ export const FileSearch: React.FC<FileSearchProps> = ({ onSearch, files }) => {
                   onClick={() => handleInputChange('file_type', type.id)}
                   className={`flex items-center justify-center p-2 rounded-lg border ${
                     tempFilters.file_type === type.id
-                      ? 'bg-blue-50 border-blue-500 text-blue-700'
-                      : 'border-gray-200 hover:bg-gray-50'
+                      ? 'bg-gray-400 border-gray-400 text-gray-900'
+                      : 'border-gray-500 hover:bg-gray-700 text-gray-200'
                   }`}
                 >
                   <type.icon className="h-5 w-5 mr-2" />
@@ -184,13 +190,13 @@ export const FileSearch: React.FC<FileSearchProps> = ({ onSearch, files }) => {
           </div>
 
           {/* — Size range */}
-          <div className="p-4 border-t">
-            <h3 className="text-sm font-medium text-gray-700 mb-2">
+          <div className="p-4 border-t border-gray-700">
+            <h3 className="text-sm font-medium text-gray-200 mb-2">
               Size Range
             </h3>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs text-gray-500 mb-1">
+                <label className="block text-xs text-gray-300 mb-1">
                   Min Size (MB)
                 </label>
                 <input
@@ -199,11 +205,11 @@ export const FileSearch: React.FC<FileSearchProps> = ({ onSearch, files }) => {
                   onChange={e =>
                     handleInputChange('min_size', e.target.value)
                   }
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-300 bg-gray-100 text-gray-800"
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">
+                <label className="block text-xs text-gray-300 mb-1">
                   Max Size (MB)
                 </label>
                 <input
@@ -212,20 +218,20 @@ export const FileSearch: React.FC<FileSearchProps> = ({ onSearch, files }) => {
                   onChange={e =>
                     handleInputChange('max_size', e.target.value)
                   }
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-300 bg-gray-100 text-gray-800"
                 />
               </div>
             </div>
           </div>
 
           {/* — Date range */}
-          <div className="p-4 border-t">
-            <h3 className="text-sm font-medium text-gray-700 mb-2">
+          <div className="p-4 border-t border-gray-700">
+            <h3 className="text-sm font-medium text-gray-200 mb-2">
               Date Range
             </h3>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs text-gray-500 mb-1">
+                <label className="block text-xs text-gray-300 mb-1">
                   Start Date
                 </label>
                 <input
@@ -234,11 +240,11 @@ export const FileSearch: React.FC<FileSearchProps> = ({ onSearch, files }) => {
                   onChange={e =>
                     handleInputChange('start_date', e.target.value)
                   }
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-300 bg-gray-100 text-gray-800"
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">
+                <label className="block text-xs text-gray-300 mb-1">
                   End Date
                 </label>
                 <input
@@ -247,24 +253,24 @@ export const FileSearch: React.FC<FileSearchProps> = ({ onSearch, files }) => {
                   onChange={e =>
                     handleInputChange('end_date', e.target.value)
                   }
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-300 bg-gray-100 text-gray-800"
                 />
               </div>
             </div>
           </div>
 
           {/* — Actions */}
-          <div className="p-4 border-t">
+          <div className="p-4 border-t border-gray-700">
             <div className="flex gap-2">
               <button
                 onClick={handleReset}
-                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                className="flex-1 px-4 py-2 text-sm font-medium text-gray-200 bg-gray-700 border border-gray-500 rounded-lg hover:bg-gray-600"
               >
                 Reset
               </button>
               <button
                 onClick={handleApply}
-                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                className="flex-1 px-4 py-2 text-sm font-medium text-gray-900 bg-gray-400 rounded-lg hover:bg-gray-500"
               >
                 Apply
               </button>
@@ -274,7 +280,7 @@ export const FileSearch: React.FC<FileSearchProps> = ({ onSearch, files }) => {
       ) : (
         <div className="h-full flex items-center justify-center">
           {hasActiveFilters && (
-            <div className="absolute top-2 right-2 bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+            <div className="absolute top-2 right-2 bg-gray-400 text-gray-900 text-xs rounded-full w-5 h-5 flex items-center justify-center">
               {selectedFiles.length}
             </div>
           )}
