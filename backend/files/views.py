@@ -77,7 +77,6 @@ def combined_file_stats_view(request):
 
 class FileFilter(filters.BaseFilterBackend):
     def filter_queryset(self, request, queryset, view):
-        # Get filter parameters
         filename = request.query_params.get('filename', '')
         file_type = request.query_params.get('file_type', '')
         min_size = request.query_params.get('min_size')
@@ -86,58 +85,37 @@ class FileFilter(filters.BaseFilterBackend):
         end_date = request.query_params.get('end_date')
         selected_files = request.query_params.getlist('selected_files')
 
-        print(f"Received filters - file_type: {file_type}, filename: {filename}, min_size: {min_size}, max_size: {max_size}")
+        # Combine all filters using Q for optimized SQL
+        filters_q = Q()
 
-        # Apply filename search
         if filename:
-            queryset = queryset.filter(original_filename__icontains=filename)
-            print(f"After filename filter: {queryset.count()} files")
+            filters_q &= Q(original_filename__icontains=filename)
 
-        # Apply file type filter
-        if file_type and file_type != 'all':
-            queryset = queryset.filter(file_type=file_type)
-            print(f"After file_type filter: {queryset.count()} files")
+        if file_type and file_type.lower() != 'all':
+            filters_q &= Q(file_type=file_type)
 
-        # Apply size range filter
-        if min_size:
-            try:
-                min_size_bytes = int(min_size)
-                queryset = queryset.filter(size__gte=min_size_bytes)
-                print(f"After min_size filter: {queryset.count()} files")
-            except ValueError:
-                pass
-        if max_size:
-            try:
-                max_size_bytes = int(max_size)
-                queryset = queryset.filter(size__lte=max_size_bytes)
-                print(f"After max_size filter: {queryset.count()} files")
-            except ValueError:
-                pass
+        try:
+            if min_size:
+                filters_q &= Q(size__gte=int(min_size))
+            if max_size:
+                filters_q &= Q(size__lte=int(max_size))
+        except ValueError:
+            pass  # Ignore invalid size inputs
 
-        # Apply date range filter
-        if start_date:
-            try:
-                start_date = datetime.strptime(start_date, '%Y-%m-%d')
-                queryset = queryset.filter(uploaded_at__gte=start_date)
-                print(f"After start_date filter: {queryset.count()} files")
-            except ValueError:
-                pass
-        if end_date:
-            try:
-                end_date = datetime.strptime(end_date, '%Y-%m-%d')
-                end_date = end_date + timedelta(days=1)  # Include the entire end date
-                queryset = queryset.filter(uploaded_at__lt=end_date)
-                print(f"After end_date filter: {queryset.count()} files")
-            except ValueError:
-                pass
+        try:
+            if start_date:
+                parsed_start = datetime.strptime(start_date, '%Y-%m-%d')
+                filters_q &= Q(uploaded_at__gte=parsed_start)
+            if end_date:
+                parsed_end = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
+                filters_q &= Q(uploaded_at__lt=parsed_end)
+        except ValueError:
+            pass  # Ignore invalid date inputs
 
-        # Apply selected files filter
         if selected_files:
-            queryset = queryset.filter(id__in=selected_files)
-            print(f"After selected_files filter: {queryset.count()} files")
+            filters_q &= Q(id__in=selected_files)
 
-        print(f"Final filtered count: {queryset.count()} files")
-        return queryset
+        return queryset.filter(filters_q)
 
 class FileViewSet(viewsets.ModelViewSet):
     queryset = File.objects.all()
