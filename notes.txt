@@ -70,3 +70,5 @@ PRESENTATION TIPS:
 - Highlight specific challenges and solutions
 - Share metrics on development time improvement
 - End with personal learning experience 
+
+Need to modify the File model to save the file by hash name instead of uuid

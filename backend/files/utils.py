@@ -1,6 +1,7 @@
 # utils.py
 from django.db.models import Count, F, Sum
 from .models import File
+import hashlib
 
 def calculate_storage_savings():
     """
@@ -33,3 +34,15 @@ def get_file_stats():
     print("Total size:", total_size_bytes, "bytes")
     total_size_in_megabytes = total_size_bytes / (1024 ** 2)
     return total_files, total_size_in_megabytes
+
+def compute_file_hash(file_obj):
+    """
+    Compute and return the SHA256 hash for the given file object.
+    The file pointer is expected to be at the beginning of the file.
+    """
+    file_obj.seek(0)
+    hasher = hashlib.sha256()
+    for chunk in file_obj.chunks():
+        hasher.update(chunk)
+    # Return the hexadecimal digest.
+    return hasher.hexdigest()

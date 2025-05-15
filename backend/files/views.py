@@ -19,8 +19,7 @@ from django.conf import settings
 from django.http import FileResponse
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
-import os
-import hashlib
+from .utils import compute_file_hash
 
 # Configure logger
 logger = logging.getLogger('files')
@@ -173,6 +172,7 @@ class FileViewSet(viewsets.ModelViewSet):
             file_obj = request.FILES.get('file')
             if not file_obj:
                 return Response({'error': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
+            file_hash = compute_file_hash(file_obj)
             
             data = {
                 'file': file_obj,
@@ -180,16 +180,18 @@ class FileViewSet(viewsets.ModelViewSet):
                 'file_type': get_file_type(file_obj.name),
                 'size': file_obj.size
             }
+            file_instance, created = File.objects.get_or_create(
+                file_hash=file_hash,
+                defaults=data
+            )
             
-            serializer = self.get_serializer(data=data)
-            serializer.is_valid(raise_exception=True)
-            self.perform_create(serializer)
-            
-            headers = self.get_success_headers(serializer.data)
-            response = Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+            serializer = FileSerializer(data=data)
+            status_code = status.HTTP_201_CREATED if created else status.HTTP_200_OK
+            response = Response(serializer.data, status=status_code)
             logger.info('API: Create file success', {
                 'status_code': response.status_code,
-                'file_id': response.data.get('id')
+                'file_id': file_instance.id,
+                'created': created
             })
             return response
         except Exception as e:
