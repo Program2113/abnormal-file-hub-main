@@ -26,7 +26,9 @@ RUN python manage.py collectstatic --noinput
 
 # Make start script executable
 COPY start.sh .
-RUN chmod +x start.sh
+RUN chmod +x start.sh \
+    && sed -i 's/\r//' start.sh
+
 
 EXPOSE 8000
 

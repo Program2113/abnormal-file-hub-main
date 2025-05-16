@@ -4,6 +4,9 @@
 mkdir -p /app/data
 chmod -R 777 /app/data
 
+# Force recreate the database if needed (comment this out in production)
+rm -f /app/data/db.sqlite3
+
 # Run migrations
 echo "Running migrations..."
 python manage.py makemigrations

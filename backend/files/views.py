@@ -5,7 +5,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q, Sum, Count
 from datetime import datetime, timedelta
 from .models import File, get_file_type
-from .utils import calculate_storage_savings, get_file_stats
+from .utils import calculate_storage_savings, get_file_stats, compute_file_hash
 from .serializers import FileSerializer
 from django.shortcuts import render
 from rest_framework.decorators import action
@@ -19,7 +19,6 @@ from django.conf import settings
 from django.http import FileResponse
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
-from .utils import compute_file_hash
 
 # Configure logger
 logger = logging.getLogger('files')
@@ -36,14 +35,14 @@ def combined_file_stats_view(request):
         })
         
         # Get file statistics using utility function
-        total_files, total_size_bytes = get_file_stats()
+        total_files, total_size_bytes = get_file_stats(File)
         logger.debug("File statistics retrieved", extra={
             'total_files': total_files,
             'total_size_bytes': total_size_bytes
         })
         
         # Calculate storage savings using utility function
-        savings_bytes = calculate_storage_savings()
+        savings_bytes = calculate_storage_savings(File)
         logger.debug("Storage savings calculated", extra={
             'savings_bytes': savings_bytes
         })
@@ -162,7 +161,7 @@ class FileViewSet(viewsets.ModelViewSet):
                 'traceback': traceback.format_exc()
             })
             raise
-
+    
     def create(self, request, *args, **kwargs):
         logger.info('API: Create file request received', {
             'filename': request.FILES.get('file').name if request.FILES.get('file') else None,
@@ -174,24 +173,38 @@ class FileViewSet(viewsets.ModelViewSet):
                 return Response({'error': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
             file_hash = compute_file_hash(file_obj)
             
-            data = {
-                'file': file_obj,
-                'original_filename': file_obj.name,
-                'file_type': get_file_type(file_obj.name),
-                'size': file_obj.size
-            }
-            file_instance, created = File.objects.get_or_create(
-                file_hash=file_hash,
-                defaults=data
-            )
+            # Check if a file with the same hash already exists
+            existing_file = File.objects.filter(file_hash=file_hash).first()
             
-            serializer = FileSerializer(data=data)
-            status_code = status.HTTP_201_CREATED if created else status.HTTP_200_OK
-            response = Response(serializer.data, status=status_code)
+            if existing_file:
+                # Reuse the stored file content from existing file
+                new_file = File(
+                    file=existing_file.file,
+                    original_filename=file_obj.name,
+                    file_type=get_file_type(file_obj.name),
+                    size=file_obj.size,
+                    file_hash=file_hash
+                )
+                new_file.save()
+                serializer = FileSerializer(new_file)
+                response = Response(serializer.data)
+            else:
+                # No existing file with this hash, create new record with uploaded file
+                new_file = File(
+                    file=file_obj,
+                    original_filename=file_obj.name,
+                    file_type=get_file_type(file_obj.name),
+                    size=file_obj.size,
+                    file_hash=file_hash
+                )
+                new_file.save()
+                serializer = FileSerializer(new_file)
+                response = Response(serializer.data)
+            
             logger.info('API: Create file success', {
                 'status_code': response.status_code,
-                'file_id': file_instance.id,
-                'created': created
+                'file_id': new_file.id,
+                'created': True
             })
             return response
         except Exception as e:

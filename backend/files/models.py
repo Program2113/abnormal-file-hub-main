@@ -39,7 +39,7 @@ class File(models.Model):
     file_type = models.CharField(max_length=100)
     size = models.BigIntegerField()
     uploaded_at = models.DateTimeField(auto_now_add=True)
-    file_hash = models.CharField(max_length=64, unique=True, editable=False)
+    file_hash = models.CharField(max_length=64, editable=False)
 
     class Meta:
         ordering = ['-uploaded_at']

@@ -1,9 +1,11 @@
 # utils.py
 from django.db.models import Count, F, Sum
-from .models import File
+# from .models import File
+from django.db import models
+
 import hashlib
 
-def calculate_storage_savings():
+def calculate_storage_savings(file_obj: models.Model):
     """
     Calculate total storage savings (in bytes) due to deduplication.
     For each group of File records with the same file_hash,
@@ -14,7 +16,7 @@ def calculate_storage_savings():
     print("Calculating storage savings...")
     
     groups = (
-        File.objects.values('file_hash')
+        file_obj.objects.values('file_hash')
         .annotate(count=Count('id'), file_size=F('size'))
         .filter(count__gt=1)
     )
@@ -24,12 +26,12 @@ def calculate_storage_savings():
     print("Total savings:", total_savings, "bytes")
     return total_savings
 
-def get_file_stats():
+def get_file_stats(file_obj):
     """
     Return total number of uploaded files and total size (in bytes).
     """
-    total_files = File.objects.count()
-    total_size_bytes = File.objects.aggregate(total=Sum('size'))['total'] or 0
+    total_files = file_obj.objects.count()
+    total_size_bytes = file_obj.objects.aggregate(total=Sum('size'))['total'] or 0
     print("Total files:", total_files)
     print("Total size:", total_size_bytes, "bytes")
     total_size_in_megabytes = total_size_bytes / (1024 ** 2)
