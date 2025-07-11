@@ -5,7 +5,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q, Sum, Count
 from datetime import datetime, timedelta
 from .models import File, get_file_type
-from .utils import calculate_storage_savings, get_file_stats
+from .utils import calculate_storage_savings, get_file_stats, extract_text_from_file, compute_file_hash
 from .serializers import FileSerializer
 from django.shortcuts import render
 from rest_framework.decorators import action
@@ -77,6 +77,9 @@ def combined_file_stats_view(request):
 
 class FileFilter(filters.BaseFilterBackend):
     def filter_queryset(self, request, queryset, view):
+        print("File filter view is invoked...")
+        print(request.query_params)
+        print(f"Initial queryset: {queryset}")
         # Get filter parameters
         filename = request.query_params.get('filename', '')
         file_type = request.query_params.get('file_type', '')
@@ -85,8 +88,9 @@ class FileFilter(filters.BaseFilterBackend):
         start_date = request.query_params.get('start_date')
         end_date = request.query_params.get('end_date')
         selected_files = request.query_params.getlist('selected_files')
+        content_query = request.query_params.get('content_query', '')
 
-        print(f"Received filters - file_type: {file_type}, filename: {filename}, min_size: {min_size}, max_size: {max_size}")
+        print(f"Received filters - file_type: {file_type}, filename: {filename}, min_size: {min_size}, max_size: {max_size}, content_filter: {content_query}")
 
         # Apply filename search
         if filename:
@@ -136,6 +140,10 @@ class FileFilter(filters.BaseFilterBackend):
             queryset = queryset.filter(id__in=selected_files)
             print(f"After selected_files filter: {queryset.count()} files")
 
+        if content_query:
+            queryset = queryset.filter(content_text__icontains=content_query)
+            print(f"After content_query filter: {queryset.count()} files")
+            
         print(f"Final filtered count: {queryset.count()} files")
         return queryset
 
@@ -146,16 +154,20 @@ class FileViewSet(viewsets.ModelViewSet):
     filterset_fields = ['file_type']
 
     def list(self, request, *args, **kwargs):
-        logger.info('API: List files request received', {
-            'query_params': dict(request.query_params),
-            'user': request.user.username if request.user.is_authenticated else 'anonymous'
-        })
+        logger.info(
+            'API: List files request received | query_params: %s | user: %s',
+            dict(request.query_params),
+            request.user.username if request.user.is_authenticated else 'anonymous'
+        )
+
         try:
             response = super().list(request, *args, **kwargs)
-            logger.info('API: List files response', {
-                'status_code': response.status_code,
-                'count': len(response.data)
-            })
+            logger.info(
+            'API: List files response | status_code: %s | count: %s',
+            response.status_code,
+            len(response.data)
+            )
+
             return response
         except Exception as e:
             logger.error('API: List files error', {
@@ -174,11 +186,18 @@ class FileViewSet(viewsets.ModelViewSet):
             if not file_obj:
                 return Response({'error': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
             
+            # 👇 --- Start of new logic ---
+            # Extract text from the file before creating the serializer
+            extracted_text = extract_text_from_file(file_obj)
+            # --- End of new logic ---
+
             data = {
                 'file': file_obj,
                 'original_filename': file_obj.name,
                 'file_type': get_file_type(file_obj.name),
-                'size': file_obj.size
+                'size': file_obj.size,
+                # 👇 Pass the extracted text to the serializer data
+                'content_text': extracted_text
             }
             
             serializer = self.get_serializer(data=data)
@@ -199,6 +218,40 @@ class FileViewSet(viewsets.ModelViewSet):
             })
             raise
 
+
+    def perform_create(self, serializer: FileSerializer):
+        uploaded_file = self.request.FILES.get("file")
+        print(f"type: {type(uploaded_file)}")
+        original_filename = uploaded_file.name
+        file_type = get_file_type(original_filename)
+
+        # Compute file hash
+        uploaded_file.seek(0)
+        file_hash = compute_file_hash(uploaded_file)
+        uploaded_file.seek(0)
+
+        # Check for duplicate
+        duplicate = File.objects.filter(file_hash=file_hash).first()
+        print("is duplicate:", duplicate)
+
+        if duplicate:
+            # Point to the same file field and size
+            serializer.save(
+                file=duplicate.file,
+                size=duplicate.size,
+                file_type=file_type,
+                file_hash=file_hash
+            )
+        else:
+            # Save new file
+            serializer.save(
+                size=uploaded_file.size,
+                file_type=file_type,
+                file_hash=file_hash
+            )
+        print("File saved...")
+    
+    
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         logger.info('API: Delete file request received', {

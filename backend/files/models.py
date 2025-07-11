@@ -53,6 +53,8 @@ class File(models.Model):
     size = models.BigIntegerField()
     uploaded_at = models.DateTimeField(auto_now_add=True)
     file_hash = models.CharField(max_length=64, blank=True)
+    # 👇 Added this field to the new version
+    content_text = models.TextField(blank=True, null=True, help_text="Extracted text content of the file")
 
     class Meta:
         ordering = ['-uploaded_at']
@@ -60,26 +62,26 @@ class File(models.Model):
     def __str__(self):
         return self.original_filename
 
-    def save(self, *args, **kwargs):
-        # Set file type based on extension
-        if not self.file_type:
-            self.file_type = get_file_type(self.original_filename)
+    # def save(self, *args, **kwargs):
+    #     # Set file type based on extension
+    #     if not self.file_type:
+    #         self.file_type = get_file_type(self.original_filename)
             
-        # Compute and set file_hash if it's not already set
-        if not self.file_hash:
-            self.file.seek(0)
-            self.file_hash = compute_file_hash(self.file)
-            self.file.seek(0)  # Reset file pointer after computing the hash
+    #     # Compute and set file_hash if it's not already set
+    #     if not self.file_hash:
+    #         self.file.seek(0)
+    #         self.file_hash = compute_file_hash(self.file)
+    #         self.file.seek(0)  # Reset file pointer after computing the hash
 
-        # Check if an identical file exists
-        duplicate = File.objects.filter(file_hash=self.file_hash).exclude(id=self.id).first()
-        if duplicate:
-            # Point to the same physical file
-            self.file = duplicate.file
-            # Use the duplicate's size since we're using the same file
-            self.size = duplicate.size
-        else:
-            # Update the file size based on the current file
-            self.size = self.file.size
+    #     # Check if an identical file exists
+    #     duplicate = File.objects.filter(file_hash=self.file_hash).exclude(id=self.id).first()
+    #     if duplicate:
+    #         # Point to the same physical file
+    #         self.file = duplicate.file
+    #         # Use the duplicate's size since we're using the same file
+    #         self.size = duplicate.size
+    #     else:
+    #         # Update the file size based on the current file
+    #         self.size = self.file.size
 
-        super().save(*args, **kwargs)
+    #     super().save(*args, **kwargs)
